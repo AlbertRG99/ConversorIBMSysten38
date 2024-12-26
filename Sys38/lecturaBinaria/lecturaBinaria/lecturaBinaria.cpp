@@ -9,16 +9,6 @@
 
 using namespace std;
 
-/*
-    POR HACER:
-
-    - Procesar la incrustación de documentos            []
-    - Automatizar conversión a DOCX                     [x]
-    - Automatizar conversion a PDF                      [x]
-    - Aplicar y eliminar las instrucciones del final    []
-
-*/
-
 
 // Ruta PC casa (windows)
 string ruta_doc_orig = R"(C:\Users\JOSEA\Documents\GitHub\ConversorIBMSysten38\Sys38\lecturaBinaria\lecturaBinaria\PL0200.txt)";
@@ -115,7 +105,6 @@ void eliminarInstruccionesFinales(const string& nombreArchivo) {
     archivoEntrada.close();
 
     // Eliminar las líneas que comienzan con las secuencias especificadas
-    vector<string> secuencias = { ".im ", ".PF", ".PR", ".CH" };
     auto it = lineas.begin();
     while (it != lineas.end()) {
         string lineaSinEspacios = *it;
@@ -123,11 +112,11 @@ void eliminarInstruccionesFinales(const string& nombreArchivo) {
         lineaSinEspacios.erase(0, lineaSinEspacios.find_first_not_of(" \t"));
 
         bool eliminar = false;
-        for (const auto& secuencia : secuencias) {
-            if (lineaSinEspacios.find(secuencia) == 0) {
-                eliminar = true;
-                break;
-            }
+        if (lineaSinEspacios.find(".im") == 0) {
+            eliminar = true;
+        }
+        else if (lineaSinEspacios[0] == '.' && isupper(lineaSinEspacios[1])) {
+            eliminar = true;
         }
 
         if (eliminar) {
@@ -153,7 +142,6 @@ void eliminarInstruccionesFinales(const string& nombreArchivo) {
 
     cout << "Las instrucciones finales que comienzan con las secuencias especificadas han sido eliminadas del archivo " << nombreArchivo << "." << endl;
 }
-
 
 // Lee el fichero en ANSII y lo almacena en un vector en modo binario
 
