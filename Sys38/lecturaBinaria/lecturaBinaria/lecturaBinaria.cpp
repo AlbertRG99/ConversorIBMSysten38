@@ -35,7 +35,7 @@ vector< vector<int> > convBinarioDecimal(vector< vector< bitset<8> > >&);
 vector<vector<int>> convBinarioDecimal(vector<vector<bitset<8>>>&);
 vector<vector<unsigned char>> leerASCII(string&);
 vector<vector<variant<int, unsigned char>>> crearDocMixto(vector<vector<unsigned char>>&, vector<vector<int>>&);
-void procesarTextoMixto(vector<vector<variant<int, unsigned char>>>&);
+vector<vector<variant<int, unsigned char, string>>> procesarTextoMixto(vector<vector<variant<int, unsigned char>>>&);
 bool esParrafo(vector<variant<int, unsigned char>>& linea);
 bool esControl(vector<variant<int, unsigned char>>& linea);
 bool esControl(vector<int>&);
@@ -53,8 +53,9 @@ void insertarIncrustacion(vector<vector<variant<int, unsigned char, string>>>&, 
 vector<pair<int, string>> getLineasInc(vector<vector<variant<int, unsigned char, string>>>&);
 string getNombreInc(vector<variant<int, unsigned char>>&);
 string getNombreInc(vector<variant<int, unsigned char, string>>&);
-void procesarIncrustaciones(vector<vector<variant<int, unsigned char, string>>>&);
+vector<vector<variant<int, unsigned char, string>>> procesarIncrustaciones(vector<vector<variant<int, unsigned char, string>>>&);
 vector<vector<variant<int, unsigned char, string>>> importarIncrustacion(string);
+void eliminarInstruccionesFinales(const string& );
 
 void imprimirBinario(vector< vector< bitset<8> > >& doc_binario);
 void imprimirDocumentoDecimal(const vector<vector<int>>& docDec);
@@ -84,12 +85,74 @@ int main() {
 
     // --> PASO 2: DETECCIÓN DE LÍNEAS Y APLICACIÓN DE ESTILOS
 
-    procesarTextoMixto(docMix);
+    // Procesar el texto mixto y obtener el documento con estilos aplicados
+    vector<vector<variant<int, unsigned char, string>>> estiloDocMix = procesarTextoMixto(docMix);
+
+    // Volcar el documento procesado en un archivo HTML
+    volcarEnArchivo("nuevo.html", estiloDocMix);
+
+    // Eliminar instrucciones finales
+	eliminarInstruccionesFinales("nuevo.html");
 
     return 0;
 }
 
+// Elimina las instrucciones finales del archivo HTML
 
+void eliminarInstruccionesFinales(const string& nombreArchivo) {
+    ifstream archivoEntrada(nombreArchivo);
+    if (!archivoEntrada) {
+        cerr << "Error al abrir el archivo " << nombreArchivo << " para lectura." << endl;
+        return;
+    }
+
+    // Leer todas las líneas del archivo y almacenarlas en un vector
+    vector<string> lineas;
+    string linea;
+    while (getline(archivoEntrada, linea)) {
+        lineas.push_back(linea);
+    }
+    archivoEntrada.close();
+
+    // Eliminar las líneas que comienzan con las secuencias especificadas
+    vector<string> secuencias = { ".im ", ".PF", ".PR", ".CH" };
+    auto it = lineas.begin();
+    while (it != lineas.end()) {
+        string lineaSinEspacios = *it;
+        // Eliminar espacios en blanco al inicio
+        lineaSinEspacios.erase(0, lineaSinEspacios.find_first_not_of(" \t"));
+
+        bool eliminar = false;
+        for (const auto& secuencia : secuencias) {
+            if (lineaSinEspacios.find(secuencia) == 0) {
+                eliminar = true;
+                break;
+            }
+        }
+
+        if (eliminar) {
+            it = lineas.erase(it);
+        }
+        else {
+            ++it;
+        }
+    }
+
+    // Escribir las líneas modificadas de nuevo al archivo
+    ofstream archivoSalida(nombreArchivo);
+    if (!archivoSalida) {
+        cerr << "Error al abrir el archivo " << nombreArchivo << " para escritura." << endl;
+        return;
+    }
+
+    for (const auto& linea : lineas) {
+        archivoSalida << linea << '\n';
+    }
+
+    archivoSalida.close();
+
+    cout << "Las instrucciones finales que comienzan con las secuencias especificadas han sido eliminadas del archivo " << nombreArchivo << "." << endl;
+}
 
 
 // Lee el fichero en ANSII y lo almacena en un vector en modo binario
@@ -301,7 +364,9 @@ vector<vector<variant<int, unsigned char>>> crearDocMixto(vector<vector<unsigned
         Ø [216] -> No se hace nada.
 */
 
-void procesarTextoMixto(vector<vector<variant<int, unsigned char>>>& docMix) {
+vector<vector<variant<int, unsigned char, string>>> procesarTextoMixto(vector<vector<variant<int, unsigned char>>>& docMix) {
+    
+    /*
     // Paso 1: Nuevo almacén con soporte para etiquetas HTML
     vector<vector<variant<int, unsigned char, string>>> estiloDocMix;
 
@@ -413,14 +478,129 @@ void procesarTextoMixto(vector<vector<variant<int, unsigned char>>>& docMix) {
     // Volcar en archivo
     volcarEnArchivo("nuevo.html", estiloDocMix);
 
-    // Paso 2: Tratamiento de los párrafos (aplicar estilos a párrafos)
-    // Aquí deberías implementar la lógica para procesar los párrafos según lo necesites.
+	// Retornar el documento estilado
+	return estiloDocMix;
+
+    */
+
+    // Paso 1: Nuevo almacén con soporte para etiquetas HTML
+    vector<vector<variant<int, unsigned char, string>>> estiloDocMix;
+
+    for (auto it_linea = docMix.begin(); it_linea != docMix.end(); ++it_linea) {
+        if (esControl(*it_linea)) { // Si es una línea de control
+            // Obtengo la última línea del vector modificado
+            vector<variant<int, unsigned char, string>> linea_superior = estiloDocMix.back();
+            estiloDocMix.pop_back();
+
+            // La modifico agregándole las líneas HTML
+            vector<variant<int, unsigned char, string>> linea_estilada;
+            vector<variant<int, unsigned char>> linea_actual_control = *it_linea; // Línea actual
+
+            int ultima_etiqueta = -1;
+            int max_size = max(linea_superior.size(), linea_actual_control.size()); // Longitud máxima
+
+            for (int indice = 0; indice < max_size; ++indice) {
+                // Procesar elementos de la línea superior
+                auto procesarElemento = [&](const auto& elemento) {
+                    if (holds_alternative<int>(elemento)) {
+                        linea_estilada.push_back(get<int>(elemento));
+                    }
+                    else if (holds_alternative<unsigned char>(elemento)) {
+                        linea_estilada.push_back(get<unsigned char>(elemento));
+                    }
+                    else if (holds_alternative<string>(elemento)) {
+                        linea_estilada.push_back(get<string>(elemento));
+                    }
+                    };
+
+                if (indice < linea_actual_control.size()) { // Si hay un elemento en la línea inferior
+                    const auto& caracter = linea_actual_control[indice];
+
+                    if (holds_alternative<int>(caracter)) { // Si es un entero de control
+                        int codigo_control = get<int>(caracter);
+                        if (codigo_control == 176) { // °
+                            ultima_etiqueta = 0;
+                            if (indice < linea_superior.size()) procesarElemento(linea_superior[indice]);
+                            linea_estilada.push_back(getIniMarca(ultima_etiqueta));
+                        }
+                        else if (codigo_control == 181) { // µ o '\'
+                            ultima_etiqueta = 1;
+                            if (indice < linea_superior.size()) procesarElemento(linea_superior[indice]);
+                            linea_estilada.push_back(getIniMarca(ultima_etiqueta));
+                        }
+                        else if (codigo_control == 162 || codigo_control == 92) { // ¢
+                            ultima_etiqueta = 2;
+                            if (indice < linea_superior.size()) procesarElemento(linea_superior[indice]);
+                            linea_estilada.push_back(getIniMarca(ultima_etiqueta));
+                        }
+                        else if (codigo_control == 159) { // Ÿ (cierre)
+                            if (indice < linea_superior.size()) procesarElemento(linea_superior[indice]);
+                            linea_estilada.push_back(getFinMarca(ultima_etiqueta));
+                            ultima_etiqueta = -1; // Cierra etiqueta
+                        }
+                        else { // Otros códigos
+                            if (indice < linea_superior.size()) procesarElemento(linea_superior[indice]);
+                        }
+                    }
+                    else { // No es un entero, agregar directamente
+                        if (indice < linea_superior.size()) procesarElemento(linea_superior[indice]);
+                    }
+                }
+                else if (indice < linea_superior.size()) { // Si la línea inferior terminó, agregar superior
+                    procesarElemento(linea_superior[indice]);
+                }
+            }
+
+            // Cerrar etiquetas pendientes al final
+            if (ultima_etiqueta != -1) {
+                linea_estilada.push_back(getFinMarca(ultima_etiqueta));
+            }
+
+            // Agregar la línea estilada al documento
+            estiloDocMix.push_back(linea_estilada);
+        }
+        else { // Si no es una línea de control (normal)
+            // Crear una nueva línea en el formato adecuado para estiloDocMix
+            vector<variant<int, unsigned char, string>> nueva_linea;
+            for (const auto& caracter : *it_linea) {
+                if (holds_alternative<int>(caracter)) {
+                    nueva_linea.push_back(get<int>(caracter));
+                }
+                else if (holds_alternative<unsigned char>(caracter)) {
+                    nueva_linea.push_back(get<unsigned char>(caracter));
+                }
+            }
+            estiloDocMix.push_back(nueva_linea);
+        }
+    }
+
+    // Procesar las incrustaciones y capturar el resultado
+    estiloDocMix = procesarIncrustaciones(estiloDocMix);
+
+    // Eliminar los inicios de párrafo (a,b,c,...,z)
+    eliminarIniciosParrafo(estiloDocMix);
+
+    // Eliminar retornos de carro finales y los valores nulos
+    estiloDocMix = procesarSaltosLinea(estiloDocMix);
+
+    // Poner espacios duros HTML
+    estiloDocMix = procesarEspaciosDuros(estiloDocMix);
+
+    // Volcar en archivo
+    volcarEnArchivo("nuevo.html", estiloDocMix);
+
+    // Retornar el documento estilado
+    return estiloDocMix;
+
+
 }
 
 
 // Procesa las incristaciones del documento
 
-void procesarIncrustaciones(vector<vector<variant<int, unsigned char, string>>>& documento) {
+vector<vector<variant<int, unsigned char, string>>> procesarIncrustaciones(vector<vector<variant<int, unsigned char, string>>>& documento) {
+    
+    /*
     vector<pair<int, string>> lineas_incrustacion = getLineasInc(documento);
 
     if (lineas_incrustacion.size() != 0) {
@@ -450,6 +630,35 @@ void procesarIncrustaciones(vector<vector<variant<int, unsigned char, string>>>&
     else {
         cout << "No se han detectado incrustaciones para este archivo" << endl;
     }
+    */
+
+    vector<pair<int, string>> lineas_incrustacion = getLineasInc(documento);
+
+    if (!lineas_incrustacion.empty()) {
+        cout << "Se han detectado " << lineas_incrustacion.size() << " incrustaciones para el documento actual" << endl;
+
+        int lineas_insertadas = 0;  // Contador de líneas insertadas
+
+        for (const auto& linea_inc : lineas_incrustacion) {
+            // Ajustar la línea de inserción
+            int linea_incrustacion_correcta = linea_inc.first + lineas_insertadas;
+
+            // Obtener el documento a incrustar (procesado)
+            vector<vector<variant<int, unsigned char, string>>> incrustacion = importarIncrustacion(linea_inc.second);
+
+            // Insertar la incrustación en el documento original
+            documento.insert(documento.begin() + linea_incrustacion_correcta, incrustacion.begin(), incrustacion.end());
+
+            // Actualizar el contador de líneas insertadas
+            lineas_insertadas += incrustacion.size();
+        }
+    }
+    else {
+        cout << "No se han detectado incrustaciones para este archivo" << endl;
+    }
+
+    return documento;
+
 }
 
 
@@ -457,6 +666,7 @@ void procesarIncrustaciones(vector<vector<variant<int, unsigned char, string>>>&
 
 vector<vector<variant<int, unsigned char, string>>> importarIncrustacion(string nombre_archivo) {
 
+    /*
     vector<vector<variant<int, unsigned char, string>>> nuevo_documento;
 
     //cout << "Se intenta hacer la incrustacíón de: " << nombre_archivo << endl;
@@ -499,7 +709,9 @@ vector<vector<variant<int, unsigned char, string>>> importarIncrustacion(string 
     // Convertir el vector mixto a un vector de variantes de int, unsigned char y string como nuevo_documento
 
     for (auto it_linea = docMix.begin(); it_linea != docMix.end(); ++it_linea) {
+        
         vector<variant<int, unsigned char, string>> nueva_linea;
+        
         for (auto it_caracter = it_linea->begin(); it_caracter != it_linea->end(); ++it_caracter) {
             if (holds_alternative<int>(*it_caracter)) {
                 nueva_linea.push_back(get<int>(*it_caracter));
@@ -513,6 +725,40 @@ vector<vector<variant<int, unsigned char, string>>> importarIncrustacion(string 
 
     // -------------------------------------- >>>
     return nuevo_documento;
+    */
+
+
+    vector<vector<variant<int, unsigned char, string>>> nuevo_documento;
+
+    // TODO: PROVISIONALMENTE, SE BUSCA SOLO EN LA PRIMERA PARTE DEL NOMBRE DEL DOCUMENTO (Ej: "pl202 plenos98.Secretaria")
+    // Me quedo con lo que hay antes del primer espacio (nombre en sí del archivo)
+    size_t pos = nombre_archivo.find(' ');
+    if (pos != string::npos) {
+        nombre_archivo = nombre_archivo.substr(0, pos);
+    }
+    nombre_archivo += ".txt";
+    cout << endl << "Nombre del archivo a incrustar: " << nombre_archivo << endl << endl;
+
+    // Leer el archivo incrustado y almacenarlo en ASCII
+    vector<vector<unsigned char>> INCdocASCII = leerASCII(nombre_archivo);
+
+    // Leer el archivo incrustado y obtener el binario
+    vector<vector<bitset<8>>> INCdocBin = leerASCIIBinario(nombre_archivo);
+
+    // Pasar de binario a decimal
+    vector<vector<int>> INCdocDec = convBinarioDecimal(INCdocBin);
+
+    // Crear el archivo en mixto (decimal + char)
+    vector<vector<variant<int, unsigned char>>> docMix = crearDocMixto(INCdocASCII, INCdocDec);
+
+    // Procesar el mixto y aplicar estilos, capturando el resultado
+    vector<vector<variant<int, unsigned char, string>>> estiloDocMix = procesarTextoMixto(docMix);
+
+    // Utilizar el documento procesado como 'nuevo_documento'
+    nuevo_documento = estiloDocMix;
+
+    return nuevo_documento;
+
 
 }
 
